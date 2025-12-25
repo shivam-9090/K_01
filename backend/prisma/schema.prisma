@@ -1,0 +1,146 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum for user roles (RBAC)
+enum Role {
+  BOSS
+  EMPLOYEE
+}
+
+// Company model - represents organization hierarchy
+model Company {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  ownerId       String    // BOSS user who owns the company
+  owner         User      @relation("companyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  employees     User[]    @relation("companyEmployees")
+  auditLogs     CompanyAuditLog[]
+
+  @@index([ownerId])
+  @@index([name])
+  @@map("companies")
+}
+
+// User model
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  username          String    @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  role              Role      @default(EMPLOYEE)
+  isEmailVerified   Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  
+  // 2FA fields (BOSS-only)
+  isTwoFAEnabled    Boolean   @default(false)
+  twoFASecret       String?   // TOTP secret (encrypted in production)
+  twoFABackupCodes  String[]  // Backup codes for 2FA (hashed)
+  twoFAAttempts     Int       @default(0)
+  twoFALockUntil    DateTime?
+  
+  // Company & hierarchy
+  companyId         String?
+  company           Company?  @relation("companyEmployees", fields: [companyId], references: [id], onDelete: SetNull)
+  createdBy         String?   // ID of BOSS who created this user
+  createdByUser     User?     @relation("createdUsers", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdUsers      User[]    @relation("createdUsers") // Users created by this BOSS
+  ownedCompanies    Company[] @relation("companyOwner") // Companies owned by this BOSS
+  
+  // Auth tracking
+  lastLogin         DateTime?
+  loginAttempts     Int       @default(0)
+  lockUntil         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+
+  @@index([email])
+  @@index([username])
+  @@index([companyId])
+  @@index([createdBy])
+  @@map("users")
+}
+
+// Refresh tokens for JWT
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// Session tracking
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent     String?
+  ipAddress     String?
+  lastActivity  DateTime  @default(now())
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// Audit logs for security tracking
+model AuditLog {
+  id        String    @id @default(cuid())
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String    // LOGIN, REGISTER, PASSWORD_CHANGE, 2FA_ENABLED, etc.
+  resource  String?   // What was affected
+  metadata  String?   // Additional JSON data
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Company-level audit logs
+model CompanyAuditLog {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  action    String    // USER_CREATED, USER_REMOVED, 2FA_ENABLED, etc.
+  resource  String?   // What was affected
+  performedBy String? // User ID who performed action
+  metadata  String?   // Additional JSON data
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("company_audit_logs")
+}

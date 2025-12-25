@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: auth_postgres
+    environment:
+      POSTGRES_USER: authuser
+      POSTGRES_PASSWORD: securepassword123
+      POSTGRES_DB: auth_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U authuser']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auth_network
+
+  backend:
+    image: auth-backend:latest
+    container_name: auth_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://authuser:securepassword123@postgres:5432/auth_db
+      JWT_SECRET: ${JWT_SECRET:-super-secret-key-change-in-production-12345}
+      JWT_EXPIRATION: 3600
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      PORT: 3000
+      TOTP_WINDOW: 2
+      TWOFA_ENCRYPTION_KEY: 9Qpvif1lwGnfwS5mpANGc2MYac0hR5eWA4Smo8yIqnA=
+      EMAIL_PROVIDER: smtp
+      EMAIL_FROM: noreply@example.com
+      FRONTEND_URL: http://localhost:3000
+      SMTP_HOST: ${SMTP_HOST:-smtp.mailtrap.io}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-user}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-pass}
+      THROTTLE_LIMIT: 10
+      THROTTLE_TTL: 60000
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./certs:/app/certs
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - auth_network
+
+volumes:
+  postgres_data:
+
+networks:
+  auth_network:
+    driver: bridge
