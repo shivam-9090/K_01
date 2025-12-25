@@ -16,6 +16,7 @@ import {
   TwoFAAuthResponse,
   JwtPayload,
 } from './interfaces/auth.interface';
+import { QueueService } from '../queue/queue.service';
 
 type ClientContext = { ip?: string; userAgent?: string };
 
@@ -25,6 +26,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private usersService: UsersService,
+    private queueService: QueueService,
   ) {}
 
   // Register new user
@@ -61,6 +63,18 @@ export class AuthService {
 
     // Log the registration
     await this.logAudit(user.id, 'REGISTER', 'user', null, client);
+
+    // Send welcome email asynchronously
+    await this.queueService.sendWelcomeEmail(user.email, user.id);
+
+    // Log user action in queue
+    await this.queueService.logUserAction(
+      user.id,
+      'REGISTER',
+      'user',
+      { email: user.email, username: user.username },
+      { ip: client?.ip, userAgent: client?.userAgent },
+    );
 
     return this.generateAuthResponse(user, client);
   }

@@ -1,0 +1,221 @@
+What monitoring and logging really do
+
+Monitoring tells you something is wrong
+
+Logging tells you why it’s wrong
+
+If you have logs without monitoring, you find bugs by accident.
+If you have monitoring without logs, you stare at graphs like they owe you money.
+
+Big-picture view
+Application
+ ├─ Metrics → Monitoring system → Alerts
+ ├─ Logs → Log storage → Search
+ └─ Traces → Trace system → Request flow
+
+
+This trio is called observability. Yes, the word is annoying. Still useful.
+
+1. Logging (what happened, exactly)
+
+Logs are events, not novels.
+
+What to log
+
+Errors (always)
+
+Auth failures
+
+API requests (at least metadata)
+
+Important business events
+
+What not to log
+
+Passwords
+
+Tokens
+
+Entire request bodies “just in case”
+
+Log types
+
+Application logs: your code talking
+
+Access logs: who hit which endpoint
+
+Audit logs: security-sensitive actions
+
+Log stack (classic)
+
+ELK Stack
+OpenSearch
+
+Components:
+
+Log shipper
+
+Log storage
+
+Search + dashboard
+
+Why this helps:
+
+Debug prod issues
+
+Trace user actions
+
+Forensics when something shady happens
+
+If logs only exist on the server filesystem, they basically don’t exist.
+
+2. Monitoring (is the system healthy?)
+
+Monitoring tracks numbers over time.
+
+Key metrics (the ones that matter)
+
+Latency
+
+Error rate
+
+Throughput
+
+CPU / memory
+
+DB connections
+
+Queue depth
+
+This is not optional. This is the heartbeat.
+
+Monitoring stack
+
+Prometheus
+Grafana
+
+How it works:
+
+App exposes metrics endpoint
+
+Monitoring system scrapes data
+
+Dashboards show trends
+
+Alerts fire when thresholds break
+
+If you only monitor CPU, you are lying to yourself.
+
+3. Alerting (wake the human)
+
+Alerts are for action, not decoration.
+
+Good alerts
+
+API error rate > X%
+
+Login failures spike
+
+DB connections exhausted
+
+Bad alerts
+
+CPU at 61%
+
+Disk at 43%
+
+“Just in case” alerts
+
+If alerts go off constantly, everyone ignores them. Then the real one hits.
+
+4. Distributed tracing (where did the request go?)
+
+Used when:
+
+Microservices
+
+Async systems
+
+Kafka, queues, background jobs
+
+Jaeger
+OpenTelemetry
+
+This lets you see:
+
+Request → API → Auth → DB → Cache → Queue → Worker
+
+
+Without guessing.
+
+If you run microservices without tracing, debugging becomes astrology.
+
+5. Logging vs Monitoring vs Tracing (simple)
+Thing	Answers
+Monitoring	Is it broken?
+Logging	What happened?
+Tracing	Where did it break?
+
+All three together or don’t bother.
+
+6. Where this fits in system design
+
+Monitoring & logging are first-class components, not add-ons.
+
+In design diagrams, they connect to:
+
+Backend services
+
+Databases
+
+Queues
+
+Load balancers
+
+Every major component emits:
+
+Metrics
+
+Logs
+
+Traces
+
+If a box emits nothing, it’s a blind spot.
+
+7. Minimal sane setup (realistic)
+
+For a normal web system:
+
+Backend
+ ├─ Logs → ELK / OpenSearch
+ ├─ Metrics → Prometheus
+ └─ Dashboards → Grafana
+Alerts → Slack / Email
+
+
+That’s enough to survive production.
+
+8. How this makes your life easier
+
+Without it:
+
+Bugs reported by users
+
+“Cannot reproduce”
+
+Late-night SSH sessions
+
+With it:
+
+You see failures before users do
+
+Root cause in minutes
+
+Calm rollbacks
+
+Monitoring doesn’t prevent failure. It prevents panic.
+
+Final truth
+
+If CI/CD helps you ship faster,
+monitoring and logging help you sleep better.

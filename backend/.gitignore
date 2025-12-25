@@ -38,6 +38,12 @@ prisma/dev.db-journal
 # OS
 .DS_Store
 Thumbs.db
+
 # Temp scripts
 update-role.js
 generate-totp.js
+
+# Winston Logs
+logs/
+combined.log
+error.log

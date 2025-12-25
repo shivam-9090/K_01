@@ -1,0 +1,103 @@
+groups:
+  - name: auth_backend_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(auth_backend_api_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'High error rate detected'
+          description: 'Error rate is {{ $value }} errors/sec for the last 5 minutes.'
+
+      # Authentication failures spike
+      - alert: AuthenticationFailuresSpike
+        expr: rate(auth_backend_auth_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High authentication failure rate'
+          description: 'Authentication failures: {{ $value }} failures/sec in the last 5 minutes. Possible brute force attack.'
+
+      # 2FA failures spike
+      - alert: TwoFAFailuresSpike
+        expr: rate(auth_backend_twofa_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High 2FA failure rate'
+          description: '2FA failures: {{ $value }} failures/sec in the last 5 minutes.'
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(auth_backend_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High response time'
+          description: '95th percentile response time is {{ $value }}s for the last 5 minutes.'
+
+      # Database connection issues
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'PostgreSQL is down'
+          description: 'PostgreSQL database is not reachable.'
+
+      # Redis connection issues
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Redis is down'
+          description: 'Redis cache is not reachable.'
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="auth-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Auth backend service is down'
+          description: 'The authentication backend service is not responding.'
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="auth-backend"} > 500000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High memory usage'
+          description: 'Memory usage is {{ $value | humanize }}B for the last 10 minutes.'
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="auth-backend"}[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High CPU usage'
+          description: 'CPU usage is above 80% for the last 10 minutes.'
+
+      # Too many active sessions
+      - alert: TooManyActiveSessions
+        expr: auth_backend_active_sessions > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High number of active sessions'
+          description: 'Active sessions: {{ $value }}. Possible memory leak or attack.'

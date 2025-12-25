@@ -1,0 +1,167 @@
+1. Client
+
+Web app / Mobile app
+
+Sends requests, shows data, breaks things
+
+2. DNS
+
+Maps domain → server IP
+
+Nobody notices until it breaks
+
+3. CDN
+
+Serves static files fast
+
+Reduces backend load
+
+4. Load Balancer
+
+Distributes traffic
+
+Prevents one server from dying alone
+
+5. API Gateway
+
+Single entry point
+
+Auth, rate limit, logging, routing
+
+6. Backend / Application Server
+
+Business logic
+
+Auth checks
+
+Talks to DB, cache, queues
+
+7. Authentication
+
+Login, tokens, sessions
+
+Answers: Who are you?
+
+8. Authorization (RBAC)
+
+Boss vs Employee rules
+
+Answers: What can you do?
+
+9. Cache
+
+Redis
+
+Speed
+
+Sessions
+
+Rate limiting
+
+10. Database
+
+Source of truth
+
+SQL or NoSQL
+
+Backups matter
+
+11. Message Queue / Event System
+
+Async work
+
+Decoupling
+
+Handles spikes
+
+12. Search Engine
+
+Fast search
+
+Filters
+
+Logs search
+
+13. File/Object Storage
+
+Images, videos, docs
+
+Not your backend’s job
+
+14. CI/CD Pipeline
+
+Build
+
+Test
+
+Deploy
+
+No manual drama
+
+15. Monitoring
+
+Metrics
+
+Alerts
+
+Health checks
+
+16. Logging
+
+Debugging
+
+Auditing
+
+Security forensics
+
+17. Tracing
+
+Request flow across services
+
+Needed when system grows
+
+18. Security Layer
+
+HTTPS
+
+Secrets
+
+Rate limiting
+
+Input validation
+
+19. Scaling Strategy
+
+Horizontal vs vertical
+
+Auto-scaling
+
+Stateless services
+
+20. Backup & Recovery
+
+DB backups
+
+Disaster recovery
+
+Tested, not assumed
+
+Minimal sane system (most apps)
+Client
+ → CDN
+ → API Gateway
+ → Backend
+ → Redis
+ → Database
+ → Object Storage
+Monitoring + Logging everywhere
+CI/CD around everything
+
+
+That’s it. Anything more is scale-driven, not ego-driven.
+
+Final clarity
+
+System design is not about knowing more components.
+It’s about knowing when you actually need one.
+

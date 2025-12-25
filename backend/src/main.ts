@@ -7,7 +7,20 @@ import * as fs from 'fs';
 import * as https from 'https';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: true,
+    rawBody: true,
+  });
+
+  // Trust proxy (important for rate limiting behind NGINX)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  // Request size limits
+  expressApp.use(require('express').json({ limit: '10mb' }));
+  expressApp.use(
+    require('express').urlencoded({ extended: true, limit: '10mb' }),
+  );
 
   // Security: Helmet - Set security HTTP headers
   app.use(
@@ -29,6 +42,9 @@ async function bootstrap() {
         preload: true,
       },
       referrerPolicy: { policy: 'no-referrer' },
+      noSniff: true,
+      xssFilter: true,
+      hidePoweredBy: true,
     }),
   );
 
@@ -41,7 +57,7 @@ async function bootstrap() {
     }),
   );
 
-  // Enable CORS
+  // Enable CORS (CDN-ready)
   const allowedOrigins = (
     process.env.CORS_ORIGINS ||
     process.env.CORS_ORIGIN ||
@@ -53,10 +69,49 @@ async function bootstrap() {
 
   app.enableCors({
     origin: allowedOrigins,
-    credentials: false,
+    credentials: false, // Set true only if using cookies/sessions
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'CF-Connecting-IP', // Cloudflare real IP
+      'CF-RAY', // Cloudflare trace ID
+    ],
+    exposedHeaders: ['X-Total-Count', 'X-Cache-Status'],
     maxAge: 3600,
+  });
+
+  // Add cache control headers for different response types
+  app.use((req, res, next) => {
+    // Never cache auth/sensitive endpoints
+    if (
+      req.url.includes('/auth/') ||
+      req.url.includes('/2fa/') ||
+      req.url.includes('/users/')
+    ) {
+      res.setHeader(
+        'Cache-Control',
+        'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      );
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+    // Health checks - no cache
+    else if (req.url.includes('/health')) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+    }
+    // Metrics - cache for 30 seconds
+    else if (req.url.includes('/metrics')) {
+      res.setHeader('Cache-Control', 'public, max-age=30');
+    }
+    // Default for API responses - no cache
+    else {
+      res.setHeader('Cache-Control', 'no-cache, private');
+    }
+    next();
   });
 
   const port = process.env.PORT || 3000;
