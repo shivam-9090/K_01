@@ -16,9 +16,11 @@ api.interceptors.request.use(
   (config) => {
     // If backend is disabled, reject the request
     if (!BACKEND_ENABLED) {
-      return Promise.reject(new Error("Backend integration is currently disabled"));
+      return Promise.reject(
+        new Error("Backend integration is currently disabled")
+      );
     }
-    
+
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
