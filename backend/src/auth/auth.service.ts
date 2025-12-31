@@ -29,36 +29,64 @@ export class AuthService {
     private queueService: QueueService,
   ) {}
 
-  // Register new user
+  // Register new user (BOSS only - with company)
   async register(
     registerDto: RegisterDto,
     client?: ClientContext,
   ): Promise<AuthResponse> {
-    const { email, username, password, firstName, lastName } = registerDto;
+    const { email, password, name, companyName, mobile } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email }, { username }],
+        OR: [{ email }, { mobile }],
       },
     });
 
     if (existingUser) {
-      throw new ConflictException('Email or username already exists');
+      throw new ConflictException('Email or mobile number already exists');
+    }
+
+    // Check if company name already exists
+    const existingCompany = await this.prisma.company.findUnique({
+      where: { name: companyName },
+    });
+
+    if (existingCompany) {
+      throw new ConflictException('Company name already exists');
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-        firstName,
-        lastName,
-      },
+    // Create user as BOSS with company in a transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Create BOSS user
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          mobile,
+          password: hashedPassword,
+          role: 'BOSS', // Always BOSS for registration
+        },
+      });
+
+      // Create company and link to BOSS
+      const company = await tx.company.create({
+        data: {
+          name: companyName,
+          ownerId: newUser.id,
+        },
+      });
+
+      // Update user with company ID
+      const updatedUser = await tx.user.update({
+        where: { id: newUser.id },
+        data: { companyId: company.id },
+        include: { company: true },
+      });
+
+      return updatedUser;
     });
 
     // Log the registration
@@ -72,7 +100,7 @@ export class AuthService {
       user.id,
       'REGISTER',
       'user',
-      { email: user.email, username: user.username },
+      { email: user.email, companyName },
       { ip: client?.ip, userAgent: client?.userAgent },
     );
 

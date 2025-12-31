@@ -37,10 +37,8 @@ model Company {
 model User {
   id                String    @id @default(cuid())
   email             String    @unique
-  username          String    @unique
+  mobile            String?   @unique // Mobile/phone number
   password          String
-  firstName         String?
-  lastName          String?
   role              Role      @default(EMPLOYEE)
   isEmailVerified   Boolean   @default(false)
   isActive          Boolean   @default(true)
@@ -60,6 +58,11 @@ model User {
   createdUsers      User[]    @relation("createdUsers") // Users created by this BOSS
   ownedCompanies    Company[] @relation("companyOwner") // Companies owned by this BOSS
   
+  // Employee specific fields
+  skills            String[]  @default([]) // e.g., ["frontend", "backend", "ai/ml"]
+  achievements      String?   // Employee achievements/accomplishments
+  attendance        Int       @default(0)  // Total attendance count
+  
   // Auth tracking
   lastLogin         DateTime?
   loginAttempts     Int       @default(0)
@@ -73,7 +76,6 @@ model User {
   sessions          Session[]
 
   @@index([email])
-  @@index([username])
   @@index([companyId])
   @@index([createdBy])
   @@map("users")

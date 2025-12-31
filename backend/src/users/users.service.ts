@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -11,9 +16,7 @@ export class UsersService {
       select: {
         id: true,
         email: true,
-        username: true,
-        firstName: true,
-        lastName: true,
+        mobile: true,
         role: true,
         isEmailVerified: true,
         isActive: true,
@@ -31,23 +34,10 @@ export class UsersService {
       select: {
         id: true,
         email: true,
-        username: true,
+        mobile: true,
         role: true,
         isActive: true,
         isTwoFAEnabled: true,
-      },
-    });
-  }
-
-  async findByUsername(username: string) {
-    return this.prisma.user.findUnique({
-      where: { username },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
       },
     });
   }
@@ -60,9 +50,7 @@ export class UsersService {
         select: {
           id: true,
           email: true,
-          username: true,
-          firstName: true,
-          lastName: true,
+          mobile: true,
           role: true,
           isActive: true,
           lastLogin: true,
@@ -90,9 +78,7 @@ export class UsersService {
       select: {
         id: true,
         email: true,
-        username: true,
-        firstName: true,
-        lastName: true,
+        mobile: true,
         role: true,
         isActive: true,
         updatedAt: true,
@@ -159,5 +145,137 @@ export class UsersService {
     });
 
     return { message: 'All sessions revoked' };
+  }
+
+  // Profile management - Update company name (BOSS only)
+  async updateCompanyName(userId: string, newCompanyName: string) {
+    // Get user with company
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { company: true, ownedCompanies: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role !== 'BOSS') {
+      throw new BadRequestException(
+        'Only company owners can update company name',
+      );
+    }
+
+    // Get the company owned by this user
+    const ownedCompany = user.ownedCompanies[0];
+    if (!ownedCompany) {
+      throw new NotFoundException('No company found for this user');
+    }
+
+    // Check if new company name already exists
+    const existingCompany = await this.prisma.company.findUnique({
+      where: { name: newCompanyName },
+    });
+
+    if (existingCompany && existingCompany.id !== ownedCompany.id) {
+      throw new BadRequestException('Company name already exists');
+    }
+
+    // Update company name
+    const updatedCompany = await this.prisma.company.update({
+      where: { id: ownedCompany.id },
+      data: { name: newCompanyName },
+    });
+
+    return {
+      success: true,
+      message: 'Company name updated successfully',
+      company: updatedCompany,
+    };
+  }
+
+  // Change password for current user
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify old password
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    // Revoke all sessions for security
+    await this.revokeAllSessions(userId);
+
+    return {
+      success: true,
+      message: 'Password changed successfully. Please login again.',
+    };
+  }
+
+  // Get profile with company details
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        mobile: true,
+        role: true,
+        isEmailVerified: true,
+        isActive: true,
+        isTwoFAEnabled: true,
+        skills: true,
+        achievements: true,
+        attendance: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+          },
+        },
+        ownedCompanies: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            createdAt: true,
+            _count: {
+              select: {
+                employees: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 }
