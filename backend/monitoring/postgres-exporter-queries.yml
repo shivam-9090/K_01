@@ -1,0 +1,191 @@
+# Custom PostgreSQL queries for detailed monitoring
+
+pg_stat_user_tables:
+  query: |
+    SELECT
+      schemaname,
+      relname as table,
+      seq_scan,
+      seq_tup_read,
+      idx_scan,
+      idx_tup_fetch,
+      n_tup_ins as inserts,
+      n_tup_upd as updates,
+      n_tup_del as deletes,
+      n_live_tup as live_tuples,
+      n_dead_tup as dead_tuples
+    FROM pg_stat_user_tables;
+  metrics:
+    - schemaname:
+        usage: 'LABEL'
+        description: 'Schema name'
+    - table:
+        usage: 'LABEL'
+        description: 'Table name'
+    - seq_scan:
+        usage: 'COUNTER'
+        description: 'Number of sequential scans'
+    - seq_tup_read:
+        usage: 'COUNTER'
+        description: 'Number of tuples read by sequential scans'
+    - idx_scan:
+        usage: 'COUNTER'
+        description: 'Number of index scans'
+    - idx_tup_fetch:
+        usage: 'COUNTER'
+        description: 'Number of tuples fetched by index scans'
+    - inserts:
+        usage: 'COUNTER'
+        description: 'Number of rows inserted'
+    - updates:
+        usage: 'COUNTER'
+        description: 'Number of rows updated'
+    - deletes:
+        usage: 'COUNTER'
+        description: 'Number of rows deleted'
+    - live_tuples:
+        usage: 'GAUGE'
+        description: 'Number of live tuples'
+    - dead_tuples:
+        usage: 'GAUGE'
+        description: 'Number of dead tuples'
+
+pg_stat_database:
+  query: |
+    SELECT
+      datname,
+      numbackends as connections,
+      xact_commit as commits,
+      xact_rollback as rollbacks,
+      blks_read as blocks_read,
+      blks_hit as blocks_hit,
+      tup_returned as tuples_returned,
+      tup_fetched as tuples_fetched,
+      tup_inserted as tuples_inserted,
+      tup_updated as tuples_updated,
+      tup_deleted as tuples_deleted,
+      conflicts,
+      temp_files,
+      temp_bytes,
+      deadlocks
+    FROM pg_stat_database
+    WHERE datname = current_database();
+  metrics:
+    - datname:
+        usage: 'LABEL'
+        description: 'Database name'
+    - connections:
+        usage: 'GAUGE'
+        description: 'Number of backends currently connected'
+    - commits:
+        usage: 'COUNTER'
+        description: 'Number of transactions committed'
+    - rollbacks:
+        usage: 'COUNTER'
+        description: 'Number of transactions rolled back'
+    - blocks_read:
+        usage: 'COUNTER'
+        description: 'Number of disk blocks read'
+    - blocks_hit:
+        usage: 'COUNTER'
+        description: 'Number of buffer hits'
+    - tuples_returned:
+        usage: 'COUNTER'
+        description: 'Number of rows returned by queries'
+    - tuples_fetched:
+        usage: 'COUNTER'
+        description: 'Number of rows fetched by queries'
+    - tuples_inserted:
+        usage: 'COUNTER'
+        description: 'Number of rows inserted'
+    - tuples_updated:
+        usage: 'COUNTER'
+        description: 'Number of rows updated'
+    - tuples_deleted:
+        usage: 'COUNTER'
+        description: 'Number of rows deleted'
+    - conflicts:
+        usage: 'COUNTER'
+        description: 'Number of queries canceled due to conflicts'
+    - temp_files:
+        usage: 'COUNTER'
+        description: 'Number of temporary files created'
+    - temp_bytes:
+        usage: 'COUNTER'
+        description: 'Total amount of data written to temporary files'
+    - deadlocks:
+        usage: 'COUNTER'
+        description: 'Number of deadlocks detected'
+
+pg_slow_queries:
+  query: |
+    SELECT
+      usename as user,
+      datname as database,
+      COUNT(*) as slow_query_count,
+      EXTRACT(EPOCH FROM AVG(now() - query_start)) as avg_duration_seconds
+    FROM pg_stat_activity
+    WHERE state = 'active'
+      AND now() - query_start > interval '1 second'
+      AND query NOT LIKE '%pg_stat_activity%'
+    GROUP BY usename, datname;
+  metrics:
+    - user:
+        usage: 'LABEL'
+        description: 'Database user'
+    - database:
+        usage: 'LABEL'
+        description: 'Database name'
+    - slow_query_count:
+        usage: 'GAUGE'
+        description: 'Number of currently running slow queries'
+    - avg_duration_seconds:
+        usage: 'GAUGE'
+        description: 'Average duration of slow queries in seconds'
+
+pg_table_bloat:
+  query: |
+    SELECT
+      schemaname,
+      tablename,
+      pg_total_relation_size(schemaname||'.'||tablename) as total_bytes,
+      pg_relation_size(schemaname||'.'||tablename) as table_bytes,
+      pg_indexes_size(schemaname||'.'||tablename) as index_bytes
+    FROM pg_tables
+    WHERE schemaname NOT IN ('pg_catalog', 'information_schema');
+  metrics:
+    - schemaname:
+        usage: 'LABEL'
+        description: 'Schema name'
+    - tablename:
+        usage: 'LABEL'
+        description: 'Table name'
+    - total_bytes:
+        usage: 'GAUGE'
+        description: 'Total size including indexes and TOAST'
+    - table_bytes:
+        usage: 'GAUGE'
+        description: 'Size of the table'
+    - index_bytes:
+        usage: 'GAUGE'
+        description: 'Size of all indexes'
+
+pg_locks:
+  query: |
+    SELECT
+      mode,
+      locktype,
+      COUNT(*) as lock_count
+    FROM pg_locks
+    WHERE database = (SELECT oid FROM pg_database WHERE datname = current_database())
+    GROUP BY mode, locktype;
+  metrics:
+    - mode:
+        usage: 'LABEL'
+        description: 'Lock mode'
+    - locktype:
+        usage: 'LABEL'
+        description: 'Type of lock'
+    - lock_count:
+        usage: 'GAUGE'
+        description: 'Number of locks'

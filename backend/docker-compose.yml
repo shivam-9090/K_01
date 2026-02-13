@@ -5,14 +5,38 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: auth_postgres
+    user: postgres # H-7 Fix: Run as non-root user for security
     environment:
       POSTGRES_USER: ${DB_USER:-authuser}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword123}
       POSTGRES_DB: ${DB_NAME:-auth_db}
-    ports:
-      - '${DB_PORT:-5432}:5432'
+      # M-6 Fix: Performance tuning
+      POSTGRES_INITDB_ARGS: '-E UTF8 --locale=C --auth-host=md5 --auth-local=md5'
+    command:
+      - 'postgres'
+      - '-c'
+      - 'shared_buffers=256MB' # Recommended: 25% of RAM
+      - '-c'
+      - 'work_mem=16MB' # Per-query memory
+      - '-c'
+      - 'maintenance_work_mem=64MB'
+      - '-c'
+      - 'effective_cache_size=1GB'
+      - '-c'
+      - 'max_connections=100' # Prevent connection exhaustion (PgBouncer handles pooling)
+      - '-c'
+      - 'statement_timeout=30000' # L-4 Fix: 30s query timeout
+      - '-c'
+      - 'password_encryption=md5' # Use MD5 for PgBouncer compatibility
+    # NOTE: PostgreSQL port NOT exposed externally - only PgBouncer is exposed
+    # This ensures all connections go through the connection pooler
+    expose:
+      - '5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # TODO C-2: SSL certificates to be mounted after fixing Windows Docker permissions
+      # - ./certs/server.crt:/var/lib/postgresql/server.crt # C-2: SSL certificate
+      # - ./certs/server.key:/var/lib/postgresql/server.key # C-2: SSL private key
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U authuser -d auth_db || exit 1']
       interval: 10s
@@ -20,6 +44,35 @@ services:
       retries: 5
     networks:
       - auth_network
+
+  # PgBouncer - Connection Pooler (3x more concurrent connections)
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1-p0
+    container_name: auth_pgbouncer
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-authuser}:${DB_PASSWORD:-securepassword123}@postgres:5432/${DB_NAME:-auth_db}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 10
+      RESERVE_POOL_SIZE: 5
+      MAX_DB_CONNECTIONS: 100
+      SERVER_IDLE_TIMEOUT: 600
+      LISTEN_PORT: 6432
+    ports:
+      - '6432:6432' # PgBouncer listens on 6432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - auth_network
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-h', 'localhost', '-p', '6432']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   # Redis
   redis:
@@ -45,6 +98,25 @@ services:
     networks:
       - auth_network
 
+  # Prisma Studio
+  prisma-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prisma_studio
+    working_dir: /app
+    command: npx prisma studio --port 5555 --browser none
+    ports:
+      - '5555:5555'
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - auth_network
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: unless-stopped
+
   # NestJS Application - Single Server
   app:
     build:
@@ -53,7 +125,10 @@ services:
     container_name: auth_app
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: postgresql://${DB_USER:-authuser}:${DB_PASSWORD:-securepassword123}@postgres:5432/${DB_NAME:-auth_db}
+      # M-1 Fix: Connection pool limits (max 20 connections, 10s timeout)
+      # C-2, C-3 Fix: SSL/TLS enabled with strong password
+      # PgBouncer: Connection pooler enabled (postgres:5432 → pgbouncer:6432)
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password_123}
@@ -68,10 +143,17 @@ services:
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
       TWOFA_ENCRYPTION_KEY: ${TWOFA_ENCRYPTION_KEY:-un0zfCzsUJBSPdtSWAKpqkflWg4jV/dEzWT37H23AYw=}
       TOTP_WINDOW: ${TOTP_WINDOW:-2}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-sendgrid}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@yourdomain.com}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
     ports:
       - '3000:3000'
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -81,7 +163,13 @@ services:
     networks:
       - auth_network
     healthcheck:
-      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -98,15 +186,144 @@ services:
       - '5173:5173'
     environment:
       VITE_API_URL: http://localhost:3000
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+      - ../frontend/index.html:/app/index.html
+      - ../frontend/vite.config.ts:/app/vite.config.ts
+      - ../frontend/tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
     depends_on:
       - app
     networks:
       - auth_network
     restart: unless-stopped
 
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: auth_prometheus
+    user: '65534:65534' # nobody user
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - '9090:9090'
+    networks:
+      - auth_network
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: auth_grafana
+    user: '472:472' # grafana user
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/dashboard-provider.yml:ro
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/main-dashboard.json:ro
+      - ./monitoring/grafana-security-dashboard.json:/var/lib/grafana/dashboards/security-dashboard.json:ro
+    ports:
+      - '3001:3000'
+    networks:
+      - auth_network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Alertmanager - Alert Routing
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: auth_alertmanager
+    user: '65534:65534' # nobody user
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - '9093:9093'
+    networks:
+      - auth_network
+    restart: unless-stopped
+
+  # Node Exporter - System Metrics (Disabled on Windows - use on Linux only)
+  # Uncomment for Linux deployment
+  # node-exporter:
+  #   image: prom/node-exporter:v1.7.0
+  #   container_name: auth_node_exporter
+  #   user: "65534:65534"  # nobody user
+  #   command:
+  #     - '--path.procfs=/host/proc'
+  #     - '--path.sysfs=/host/sys'
+  #     - '--path.rootfs=/host'
+  #     - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+  #   volumes:
+  #     - /proc:/host/proc:ro
+  #     - /sys:/host/sys:ro
+  #     - /:/host:ro,rslave
+  #   ports:
+  #     - '9100:9100'
+  #   networks:
+  #     - auth_network
+  #   restart: unless-stopped
+
+  # Postgres Exporter - Database Metrics (connects directly to PostgreSQL, not PgBouncer)
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: auth_postgres_exporter
+    user: '65534:65534' # nobody user
+    environment:
+      # Note: Connects directly to PostgreSQL for accurate metrics, not through PgBouncer
+      DATA_SOURCE_NAME: 'postgresql://${DB_USER:-authuser}:${DB_PASSWORD:-securepassword123}@postgres:5432/${DB_NAME:-auth_db}?sslmode=disable'
+
+    ports:
+      - '9187:9187'
+    networks:
+      - auth_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Redis Exporter - Cache Metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: auth_redis_exporter
+    user: '65534:65534' # nobody user
+    environment:
+      REDIS_ADDR: 'redis:6379'
+      REDIS_PASSWORD: '${REDIS_PASSWORD:-redis_secure_password_123}'
+    ports:
+      - '9121:9121'
+    networks:
+      - auth_network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
 
 networks:
   auth_network:

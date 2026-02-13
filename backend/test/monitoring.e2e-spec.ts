@@ -142,9 +142,10 @@ describe('Monitoring and Health Checks (e2e)', () => {
       const testUser = {
         email: `metrics-test-${Date.now()}@example.com`,
         password: 'MetricsP@ss123',
+        name: 'Metrics Test',
+        companyName: `MetricsCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `metricstest${Date.now()}`,
-        firstName: 'Metrics',
-        lastName: 'Test',
       };
 
       // Register user
@@ -194,9 +195,10 @@ describe('Monitoring and Health Checks (e2e)', () => {
       const testUser = {
         email: `logging-test-${Date.now()}@example.com`,
         password: 'LoggingP@ss123',
+        name: 'Logging Test',
+        companyName: `LoggingCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `loggingtest${Date.now()}`,
-        firstName: 'Logging',
-        lastName: 'Test',
       };
 
       await request(app.getHttpServer()).post('/auth/register').send(testUser);

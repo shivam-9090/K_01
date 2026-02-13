@@ -3,10 +3,22 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
 export interface EmailJob {
+  type:
+    | 'password-reset'
+    | 'welcome'
+    | 'employee-invite'
+    | '2fa-setup'
+    | 'suspicious-login'
+    | 'account-lockout';
   to: string;
-  subject: string;
-  body: string;
-  userId?: string;
+  data: {
+    resetToken?: string;
+    userName?: string;
+    companyName?: string;
+    inviteToken?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  };
 }
 
 export interface NotificationJob {
@@ -34,7 +46,7 @@ export class QueueService {
   ) {}
 
   // Email Queue
-  async sendEmail(data: EmailJob, priority: number = 5) {
+  async addEmailJob(data: EmailJob, priority: number = 5) {
     return this.emailQueue.add('send-email', data, {
       priority,
       attempts: 3,
@@ -45,38 +57,9 @@ export class QueueService {
     });
   }
 
-  async sendWelcomeEmail(to: string, userId: string) {
-    return this.sendEmail(
-      {
-        to,
-        subject: 'Welcome to Our Platform',
-        body: 'Thank you for registering!',
-        userId,
-      },
-      1,
-    ); // High priority
-  }
-
-  async send2FAEmail(to: string, code: string) {
-    return this.sendEmail(
-      {
-        to,
-        subject: '2FA Verification Code',
-        body: `Your verification code is: ${code}`,
-      },
-      1,
-    ); // High priority
-  }
-
-  async sendPasswordResetEmail(to: string, token: string) {
-    return this.sendEmail(
-      {
-        to,
-        subject: 'Password Reset Request',
-        body: `Your reset token is: ${token}`,
-      },
-      1,
-    ); // High priority
+  // Legacy method for compatibility
+  async sendEmail(data: EmailJob, priority: number = 5) {
+    return this.addEmailJob(data, priority);
   }
 
   // Notification Queue

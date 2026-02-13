@@ -9,12 +9,19 @@ datasource db {
 }
 
 // Enum for user roles (RBAC)
+// L-3 Fix: Enum documentation
+// BOSS: Company owner with full permissions (registered user)
+// EMPLOYEE: Team member with configurable granular permissions
 enum Role {
   BOSS
   EMPLOYEE
 }
 
 // Company model - represents organization hierarchy
+// M-3 Fix: Cascade rules documented
+// Multi-tenancy: Each company is isolated
+// onDelete: Restrict prevents accidental BOSS deletion (must reassign ownership)
+// Cascading: Projects, Teams, CompanyAuditLog deleted when company deleted
 model Company {
   id            String    @id @default(cuid())
   name          String    @unique
@@ -27,16 +34,156 @@ model Company {
   // Relations
   employees     User[]    @relation("companyEmployees")
   auditLogs     CompanyAuditLog[]
+  projects      Project[]
+  teams         Team[]
 
   @@index([ownerId])
   @@index([name])
   @@map("companies")
 }
 
+// Team model - BOSS can create teams and assign employees
+// M-3 Fix: onDelete: Cascade means team deleted when company deleted
+model Team {
+  id            String    @id @default(cuid())
+  name          String
+  teamType      String    // L-3: Valid values: frontend, backend, ai/ml, devops, mobile, testing, database, ui/ux
+  description   String?
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById   String    // BOSS who created the team
+  memberIds     String[]  // Array of employee IDs in this team
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  projects      ProjectTeam[]  // Many-to-many with projects
+
+  @@index([companyId])
+  @@index([createdById])
+  @@index([teamType])
+  @@map("teams")
+}
+
+// Project model - BOSS can create projects
+model Project {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?   // Notes about the project
+  source        String?   // Project source/origin
+  startDate     DateTime
+  closeDate     DateTime?
+  status        String    @default("active") // L-3: Valid values: active, completed, cancelled
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade) // M-3: Project deleted with company
+  createdById   String    // BOSS who created the project
+  
+  // GitHub Repository Integration
+  githubRepoName     String?   // Repository name (e.g., "owner/repo")
+  githubRepoUrl      String?   // Full GitHub repo URL
+  githubRepoBranch   String?   @default("main") // Default branch
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  tasks         Task[]
+  chatMessages  ProjectChat[]
+  teams         ProjectTeam[]  // Many-to-many with teams
+
+  @@index([companyId])
+  @@index([createdById])
+  @@index([status])
+  @@map("projects")
+}
+
+// Junction table for many-to-many relationship between Projects and Teams
+model ProjectTeam {
+  id        String   @id @default(cuid())
+  projectId String
+  teamId    String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, teamId])
+  @@index([projectId])
+  @@index([teamId])
+  @@map("project_teams")
+}
+
+// ProjectChat model - Real-time chat for projects
+model ProjectChat {
+  id            String    @id @default(cuid())
+  message       String    // Chat message content
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId      String    // User who sent the message
+  sender        User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  attachments   String[]  @default([]) // Array of file URLs/paths
+  isPinned      Boolean   @default(false)
+  pinnedBy      String?   // Boss who pinned the message
+  pinnedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([senderId])
+  @@index([isPinned])
+  @@map("project_chats")
+}
+
+// Task model - BOSS can create and assign tasks to employees
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  startDate     DateTime
+  closeDate     DateTime?
+  taskType      String    // frontend, backend, ai/ml, devops, etc.
+  status        String    @default("pending") // pending, in_progress, completed, pending_verification, cancelled
+  priority      String    @default("medium") // low, medium, high, urgent
+  
+  // Relations
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  companyId     String
+  
+  createdById   String    // BOSS who created the task
+  
+  assignedToIds String[]  // Array of employee IDs assigned to this task
+  
+  // Tracking fields
+  completedById        String?   // Employee who marked task as complete
+  verifiedByBossId      String?   // BOSS who verified/approved completion
+  completedAt           DateTime? // When task was completed by employee
+  verifiedAt            DateTime? // When task was verified by boss
+  
+  // GitHub Commit Tracking
+  completionCommitSha    String?   // SHA of the commit that completed this task
+  completionCommitUrl    String?   // GitHub URL to the commit
+  completionCommitMessage String?  // Commit message
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([companyId])
+  @@index([createdById])
+  @@index([status])
+  @@index([priority]) // Performance: Frequently used in sorting
+  @@index([taskType])
+  @@index([completedById])
+  @@map("tasks")
+}
+
 // User model
 model User {
   id                String    @id @default(cuid())
   email             String    @unique
+  username          String?   @unique // Username for login/display
+  name              String?   // Employee name
   mobile            String?   @unique // Mobile/phone number
   password          String
   role              Role      @default(EMPLOYEE)
@@ -60,13 +207,71 @@ model User {
   
   // Employee specific fields
   skills            String[]  @default([]) // e.g., ["frontend", "backend", "ai/ml"]
-  achievements      String?   // Employee achievements/accomplishments
+  achievements      String?   @db.VarChar(5000) // Employee achievements (max 5000 chars)
   attendance        Int       @default(0)  // Total attendance count
+  
+  // ════════════════════════════════════════════════════════════════════
+  //                    GRANULAR EMPLOYEE PERMISSIONS
+  //                     (All granted by BOSS via Manage tab)
+  // ════════════════════════════════════════════════════════════════════
+  
+  // PROJECT PERMISSIONS
+  canCreateProject      Boolean   @default(false) // Can create new projects
+  canUpdateProject      Boolean   @default(false) // Can edit project details
+  canDeleteProject      Boolean   @default(false) // Can delete projects
+  canViewAllProjects    Boolean   @default(false) // View all projects (not just assigned)
+  
+  // TASK PERMISSIONS  
+  canManageAllTaskPermissions Boolean @default(false) // Master permission: grants ALL task permissions (view, create, update, delete, complete, verify)
+  canCreateTask         Boolean   @default(false) // Can create new tasks
+  canUpdateTask         Boolean   @default(false) // Can edit task details
+  canDeleteTask         Boolean   @default(false) // Can delete tasks
+  canCompleteTask       Boolean   @default(false) // Can mark tasks complete without approval
+  canVerifyTask         Boolean   @default(false) // Can verify/approve completed tasks
+  canViewAllTasks       Boolean   @default(false) // View all tasks (not just assigned)
+  canViewOverdueTasks   Boolean   @default(false) // Access overdue tasks report
+  
+  // EMPLOYEE MANAGEMENT PERMISSIONS
+  canCreateEmployee     Boolean   @default(false) // Can invite/create employees
+  canUpdateEmployee     Boolean   @default(false) // Can edit employee details
+  canDeleteEmployee     Boolean   @default(false) // Can remove employees
+  canViewAllEmployees   Boolean   @default(false) // View all employees in company
+  canManagePermissions  Boolean   @default(false) // Can grant/revoke permissions to others
+  
+  // TEAM PERMISSIONS
+  canCreateTeam         Boolean   @default(false) // Can create teams
+  canUpdateTeam         Boolean   @default(false) // Can edit team details
+  canDeleteTeam         Boolean   @default(false) // Can delete teams
+  canViewAllTeams       Boolean   @default(false) // View all teams
+  
+  // ADVANCED PERMISSIONS
+  canViewAuditLogs      Boolean   @default(false) // View audit logs of all users
+  canViewAllSessions    Boolean   @default(false) // View sessions of all users
+  canManage2FA          Boolean   @default(false) // Enable/disable 2FA for self
+  
+  // GitHub OAuth fields
+  githubId          String?   @unique // GitHub user ID
+  githubUsername    String?   @unique // GitHub username
+  githubAvatarUrl   String?   // GitHub avatar URL
+  githubAccessToken String?   // GitHub access token (encrypted)
+  githubProfileUrl  String?   // GitHub profile URL
+  githubBio         String?   // GitHub bio
+  githubLocation    String?   // GitHub location
+  githubCompany     String?   // GitHub company
+  githubReposCount  Int?      // Number of public repositories
+  
+  // Relations
+  chatMessages      ProjectChat[]
   
   // Auth tracking
   lastLogin         DateTime?
   loginAttempts     Int       @default(0)
   lockUntil         DateTime?
+  
+  // Password reset
+  resetToken        String?   // Hashed reset token (bcrypt, never plaintext)
+  resetTokenExpiry  DateTime? // Token expiration time (short TTL: 1 hour)
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -78,6 +283,7 @@ model User {
   @@index([email])
   @@index([companyId])
   @@index([createdBy])
+  @@index([role]) // Performance: Frequently filtered by role (BOSS/EMPLOYEE)
   @@map("users")
 }
 
@@ -96,12 +302,14 @@ model RefreshToken {
 }
 
 // Session tracking
+// M-2 Fix: IP address validation enforced at application level
+// M-3 Fix: onDelete: Cascade means sessions deleted when user deleted
 model Session {
   id            String    @id @default(cuid())
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userAgent     String?
-  ipAddress     String?
+  ipAddress     String?   // M-2: Validated in application (IPv4/IPv6 format)
   lastActivity  DateTime  @default(now())
   expiresAt     DateTime
   createdAt     DateTime  @default(now())
@@ -111,14 +319,15 @@ model Session {
 }
 
 // Audit logs for security tracking
+// M-3 Fix: onDelete: SetNull preserves audit logs when user deleted
 model AuditLog {
   id        String    @id @default(cuid())
   userId    String?
   user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action    String    // LOGIN, REGISTER, PASSWORD_CHANGE, 2FA_ENABLED, etc.
+  action    String    // L-3: Common values: LOGIN, REGISTER, PASSWORD_CHANGE, 2FA_ENABLED, etc.
   resource  String?   // What was affected
   metadata  String?   // Additional JSON data
-  ipAddress String?
+  ipAddress String?   // M-2: Validated in application (IPv4/IPv6 format)
   userAgent String?
   createdAt DateTime  @default(now())
 
@@ -128,16 +337,17 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// Company-level audit logs
+// Company-level audit logs (business operations)
+// M-3 Fix: onDelete: Cascade means audit logs deleted with company
 model CompanyAuditLog {
   id        String    @id @default(cuid())
   companyId String
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  action    String    // USER_CREATED, USER_REMOVED, 2FA_ENABLED, etc.
+  action    String    // L-3: Common values: USER_CREATED, USER_REMOVED, PERMISSION_CHANGED, etc.
   resource  String?   // What was affected
   performedBy String? // User ID who performed action
   metadata  String?   // Additional JSON data
-  ipAddress String?
+  ipAddress String?   // M-2: Validated in application (IPv4/IPv6 format)
   userAgent String?
   createdAt DateTime  @default(now())
 

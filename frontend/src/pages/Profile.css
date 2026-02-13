@@ -1,0 +1,75 @@
+.profile-container {
+  max-width: 900px;
+}
+
+.profile-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.profile-card {
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.profile-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.profile-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  min-width: 120px;
+}
+
+.profile-value {
+  font-size: 14px;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.profile-achievements {
+  font-size: 14px;
+  color: #1a1a1a;
+  line-height: 1.5;
+  flex: 1;
+  margin: 0;
+}
+
+.change-password-form {
+  max-width: 400px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.alert-success {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}

@@ -17,23 +17,21 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Backend application metrics - Load Balanced Instances
+  # Backend application metrics - Single Instance
   - job_name: 'auth-backend'
     static_configs:
       - targets:
-          - 'app1:3000'
-          - 'app2:3000'
-          - 'app3:3000'
+          - 'app:3000'
         labels:
-          environment: 'production'
+          environment: 'development'
           service: 'auth-backend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 
-  # Node exporter for system metrics
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
+  # Node exporter for system metrics (disabled on Windows)
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
 
   # PostgreSQL metrics
   - job_name: 'postgres'

@@ -20,6 +20,10 @@ export class MetricsService {
     @InjectMetric('active_sessions') public activeSessions: Gauge<string>,
     @InjectMetric('db_connections') public dbConnections: Gauge<string>,
     @InjectMetric('api_errors_total') public apiErrorsTotal: Counter<string>,
+    @InjectMetric('db_slow_queries_total')
+    public dbSlowQueriesTotal: Counter<string>,
+    @InjectMetric('db_query_duration_seconds')
+    public dbQueryDuration: Histogram<string>,
   ) {}
 
   recordHttpRequest(
@@ -76,5 +80,13 @@ export class MetricsService {
 
   updateDbConnections(count: number) {
     this.dbConnections.set(count);
+  }
+
+  incrementSlowQueryCounter() {
+    this.dbSlowQueriesTotal.inc();
+  }
+
+  recordQueryDuration(durationSeconds: number) {
+    this.dbQueryDuration.observe(durationSeconds);
   }
 }

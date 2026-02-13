@@ -4,6 +4,7 @@ import { QueueService } from './queue.service';
 import { EmailProcessor } from './processors/email.processor';
 import { NotificationProcessor } from './processors/notification.processor';
 import { AuditProcessor } from './processors/audit.processor';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuditProcessor } from './processors/audit.processor';
       { name: 'notification' },
       { name: 'audit' },
     ),
+    EmailModule,
   ],
   providers: [
     QueueService,

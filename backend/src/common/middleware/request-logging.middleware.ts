@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger as WinstonLogger } from 'winston';
+import { IpAddressValidator } from '../validators/ip-address.validator';
 
 @Injectable()
 export class RequestLoggingMiddleware implements NestMiddleware {
@@ -15,7 +16,9 @@ export class RequestLoggingMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    const { method, originalUrl, ip } = req;
+    const { method, originalUrl } = req;
+    // M-2 Fix: Extract and validate IP address with proxy support
+    const ip = IpAddressValidator.extractFromRequest(req);
     const startTime = Date.now();
     const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -84,12 +87,15 @@ export class RequestLoggingMiddleware implements NestMiddleware {
     statusCode: number,
   ) {
     try {
+      // M-2 Fix: Validate IP before storing in audit log
+      const validatedIp = IpAddressValidator.sanitize(ipAddress);
+
       await this.prisma.auditLog.create({
         data: {
           userId,
           action: `${method} ${url}`,
           resource: url,
-          ipAddress,
+          ipAddress: validatedIp,
           userAgent,
         },
       });

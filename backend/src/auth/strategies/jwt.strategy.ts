@@ -22,11 +22,36 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
+      sub: user.id,
       userId: user.id,
       email: user.email,
-      username: user.username,
       role: user.role,
+      companyId: user.companyId,
       isTwoFAEnabled: user.isTwoFAEnabled,
+      // Include all permission fields
+      canCreateProject: user.canCreateProject,
+      canUpdateProject: user.canUpdateProject,
+      canDeleteProject: user.canDeleteProject,
+      canViewAllProjects: user.canViewAllProjects,
+      canCreateTask: user.canCreateTask,
+      canUpdateTask: user.canUpdateTask,
+      canDeleteTask: user.canDeleteTask,
+      canCompleteTask: user.canCompleteTask,
+      canVerifyTask: user.canVerifyTask,
+      canViewAllTasks: user.canViewAllTasks,
+      canViewOverdueTasks: user.canViewOverdueTasks,
+      canCreateEmployee: user.canCreateEmployee,
+      canUpdateEmployee: user.canUpdateEmployee,
+      canDeleteEmployee: user.canDeleteEmployee,
+      canViewAllEmployees: user.canViewAllEmployees,
+      canManagePermissions: user.canManagePermissions,
+      canCreateTeam: user.canCreateTeam,
+      canUpdateTeam: user.canUpdateTeam,
+      canDeleteTeam: user.canDeleteTeam,
+      canViewAllTeams: user.canViewAllTeams,
+      canViewAuditLogs: user.canViewAuditLogs,
+      canViewAllSessions: user.canViewAllSessions,
+      canManage2FA: user.canManage2FA,
     };
   }
 }

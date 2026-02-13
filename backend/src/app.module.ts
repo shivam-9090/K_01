@@ -18,6 +18,14 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { QueueModule } from './queue/queue.module';
 import { StorageModule } from './storage/storage.module';
 import { SearchModule } from './search/search.module';
+import { ProjectsModule } from './projects/projects.module';
+import { TasksModule } from './tasks/tasks.module';
+import { TeamsModule } from './teams/teams.module';
+import { ChatModule } from './chat/chat.module';
+import { AiModule } from './ai/ai.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { RedisModule } from './redis/redis.module';
+// import { AuditLogCleanupModule } from './common/audit-log-cleanup.module'; // TODO: Re-enable after installing @nestjs/schedule
 
 @Module({
   imports: [
@@ -102,6 +110,7 @@ import { SearchModule } from './search/search.module';
     }),
     MetricsModule,
     HealthModule,
+    RedisModule,
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -110,6 +119,13 @@ import { SearchModule } from './search/search.module';
     QueueModule,
     StorageModule,
     SearchModule,
+    ProjectsModule,
+    TasksModule,
+    TeamsModule,
+    ChatModule,
+    AiModule,
+    DashboardModule,
+    // AuditLogCleanupModule, // TODO: Re-enable after installing @nestjs/schedule in Docker
   ],
   controllers: [AppController],
   providers: [

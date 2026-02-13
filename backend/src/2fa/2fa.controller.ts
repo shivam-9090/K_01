@@ -9,6 +9,12 @@ import {
   HttpStatus,
   ForbiddenException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { TwoFAService } from './2fa.service';
 import {
   Enable2FaDto,
@@ -19,12 +25,21 @@ import {
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { Throttle } from '@nestjs/throttler';
+import { IpAddressValidator } from '../common/validators/ip-address.validator';
 
+@ApiTags('2FA')
 @Controller('2fa')
 export class TwoFAController {
   constructor(private twoFAService: TwoFAService) {}
 
   @Get('generate')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Generate 2FA secret',
+    description: 'Generate TOTP secret and QR code (BOSS only)',
+  })
+  @ApiResponse({ status: 200, description: 'QR code and secret generated' })
+  @ApiResponse({ status: 403, description: 'Only BOSS can enable 2FA' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BOSS')
   @Throttle({ default: { limit: 5, ttl: 60 } })
@@ -33,6 +48,17 @@ export class TwoFAController {
   }
 
   @Post('enable')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Enable 2FA',
+    description:
+      'Activate 2FA with verification code. Returns 10 backup codes.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '2FA enabled successfully with backup codes',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid code' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BOSS')
   @HttpCode(HttpStatus.OK)
@@ -48,6 +74,19 @@ export class TwoFAController {
   }
 
   @Post('verify-login')
+  @ApiOperation({
+    summary: 'Verify 2FA login',
+    description: 'Complete 2FA login with TOTP code or backup code',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '2FA verified, JWT tokens returned',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid or expired code' })
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limited (1 attempt per minute)',
+  })
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60 } })
   async verifyTwoFALogin(@Body() dto: Verify2FaLoginDto, @Request() req) {
@@ -59,6 +98,13 @@ export class TwoFAController {
   }
 
   @Post('disable')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Disable 2FA',
+    description: 'Turn off 2FA (requires verification code and password)',
+  })
+  @ApiResponse({ status: 200, description: '2FA disabled successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid code or password' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BOSS')
   @HttpCode(HttpStatus.OK)
@@ -73,6 +119,12 @@ export class TwoFAController {
   }
 
   @Post('regenerate-backup-codes')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Regenerate backup codes',
+    description: 'Generate new set of 10 backup codes (invalidates old ones)',
+  })
+  @ApiResponse({ status: 200, description: 'New backup codes generated' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BOSS')
   @HttpCode(HttpStatus.OK)
@@ -95,12 +147,11 @@ export class TwoFAController {
   }
 
   private extractClient(req: any) {
+    // M-2 Fix: Use IP validator for IPv4/IPv6 validation and proxy support
+    const ipAddress = IpAddressValidator.extractFromRequest(req);
+
     return {
-      ip:
-        req?.ip ||
-        req?.headers?.['x-forwarded-for'] ||
-        req?.connection?.remoteAddress ||
-        req?.socket?.remoteAddress,
+      ip: ipAddress,
       userAgent: req?.headers?.['user-agent'],
     };
   }

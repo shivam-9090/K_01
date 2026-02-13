@@ -44,6 +44,15 @@ RUN npx prisma generate
 # Create certs directory for SSL
 RUN mkdir -p /app/certs
 
+# Security: Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
 # Expose port
 EXPOSE 3000
 

@@ -1,0 +1,292 @@
+{
+  "dashboard": {
+    "title": "Security Monitoring Dashboard",
+    "tags": ["security", "auth", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Failed Login Attempts (Last 1h)",
+        "type": "stat",
+        "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(auth_attempts_total{status=\"failure\"}[1h]))",
+            "legendFormat": "Failed Logins"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 10, "color": "yellow" },
+                { "value": 50, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "2FA Verification Failures",
+        "type": "stat",
+        "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(twofa_operations_total{operation=\"verify\",status=\"failure\"}[1h]))",
+            "legendFormat": "2FA Failures"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 5, "color": "yellow" },
+                { "value": 20, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active Sessions",
+        "type": "stat",
+        "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "active_sessions",
+            "legendFormat": "Sessions"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 100, "color": "yellow" },
+                { "value": 500, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "HTTP 4xx/5xx Errors",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"4..|5..\"}[5m]))",
+            "legendFormat": "Error Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "yellow" },
+                { "value": 10, "color": "red" }
+              ]
+            },
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Authentication Attempts Over Time",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(auth_attempts_total[5m]))",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "short", "label": "Attempts/sec" },
+          { "format": "short" }
+        ],
+        "legend": { "show": true, "alignAsTable": true, "rightSide": true }
+      },
+      {
+        "id": 6,
+        "title": "2FA Operations Distribution",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (operation, status) (rate(twofa_operations_total[5m]))",
+            "legendFormat": "{{operation}}-{{status}}"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "short", "label": "Operations/sec" },
+          { "format": "short" }
+        ],
+        "legend": { "show": true, "alignAsTable": true, "rightSide": true }
+      },
+      {
+        "id": 7,
+        "title": "API Errors by Status Code",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(http_requests_total{status=~\"4..|5..\"}[5m]))",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "reqps", "label": "Requests/sec" },
+          { "format": "short" }
+        ],
+        "legend": { "show": true, "alignAsTable": true, "rightSide": true }
+      },
+      {
+        "id": 8,
+        "title": "Top 10 Failed Endpoints",
+        "type": "table",
+        "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "topk(10, sum by (route) (increase(http_requests_total{status=~\"4..|5..\"}[1h])))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": { "Time": true },
+              "indexByName": {},
+              "renameByName": {
+                "route": "Endpoint",
+                "Value": "Failed Requests"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Database Connection Pool Status",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 20, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "db_connections",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "short", "label": "Connections" },
+          { "format": "short" }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": { "params": [18], "type": "gt" },
+              "operator": { "type": "and" },
+              "query": { "params": ["A", "5m", "now"] },
+              "reducer": { "params": [], "type": "avg" },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "60s",
+          "handler": 1,
+          "name": "Database Connection Pool Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 10,
+        "title": "Request Rate by Method",
+        "type": "graph",
+        "gridPos": { "x": 8, "y": 20, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "sum by (method) (rate(http_requests_total[5m]))",
+            "legendFormat": "{{method}}"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "reqps", "label": "Requests/sec" },
+          { "format": "short" }
+        ],
+        "legend": { "show": true, "alignAsTable": true, "rightSide": false }
+      },
+      {
+        "id": 11,
+        "title": "Response Time Percentiles",
+        "type": "graph",
+        "gridPos": { "x": 16, "y": 20, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p90"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p99"
+          }
+        ],
+        "xaxis": { "mode": "time" },
+        "yaxes": [
+          { "format": "s", "label": "Duration" },
+          { "format": "short" }
+        ],
+        "legend": { "show": true, "alignAsTable": true, "rightSide": false }
+      },
+      {
+        "id": 12,
+        "title": "Security Events Timeline",
+        "type": "logs",
+        "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "{job=\"auth-backend\"} |= \"SECURITY\" or \"UNAUTHORIZED\" or \"FORBIDDEN\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "sortOrder": "Descending"
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d"]
+    }
+  }
+}

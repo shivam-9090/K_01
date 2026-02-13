@@ -28,9 +28,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: uniqueEmail,
           password: '12345', // Too short
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `weakpass${Date.now()}`,
-          firstName: 'Test',
-          lastName: 'User',
         });
 
       expect(response.status).toBe(400);
@@ -45,9 +46,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: uniqueEmail,
           password: 'simplepassword', // No special chars, no uppercase, no numbers
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `simplepass${Date.now()}`,
-          firstName: 'Test',
-          lastName: 'User',
         });
 
       expect(response.status).toBe(400);
@@ -59,9 +61,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: uniqueEmail,
           password: 'StrongP@ssw0rd!', // Uppercase, lowercase, number, special char
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `strongpass${Date.now()}`,
-          firstName: 'Test',
-          lastName: 'User',
         });
 
       expect([200, 201, 409]).toContain(response.status);
@@ -71,9 +74,10 @@ describe('Authentication Security (e2e)', () => {
       const testUser = {
         email: `hash-test-${Date.now()}@example.com`,
         password: 'MySecureP@ss123',
+        name: 'Hash Test',
+        companyName: `HashCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `hashtest${Date.now()}`,
-        firstName: 'Hash',
-        lastName: 'Test',
       };
 
       await request(app.getHttpServer()).post('/auth/register').send(testUser);
@@ -94,9 +98,10 @@ describe('Authentication Security (e2e)', () => {
       const testUser = {
         email: `incorrect-${Date.now()}@example.com`,
         password: 'CorrectP@ss123',
+        name: 'Incorrect Test',
+        companyName: `IncCorrectCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `incorrect${Date.now()}`,
-        firstName: 'Incorrect',
-        lastName: 'Test',
       };
 
       await request(app.getHttpServer()).post('/auth/register').send(testUser);
@@ -118,9 +123,10 @@ describe('Authentication Security (e2e)', () => {
     const testUser = {
       email: `jwt-test-${Date.now()}@example.com`,
       password: 'JwtSecureP@ss123',
+      name: 'JWT Test',
+      companyName: `JWTCo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `jwttest${Date.now()}`,
-      firstName: 'JWT',
-      lastName: 'Test',
     };
 
     beforeAll(async () => {
@@ -203,9 +209,10 @@ describe('Authentication Security (e2e)', () => {
     const testUser = {
       email: `session-test-${Date.now()}@example.com`,
       password: 'SessionP@ss123',
+      name: 'Session Test',
+      companyName: `SessionCo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `sessiontest${Date.now()}`,
-      firstName: 'Session',
-      lastName: 'Test',
     };
 
     beforeAll(async () => {
@@ -258,9 +265,10 @@ describe('Authentication Security (e2e)', () => {
       const pwChangeUser = {
         email: `pwchange-${Date.now()}@example.com`,
         password: 'OldP@ss123',
+        name: 'PwChange Test',
+        companyName: `PwChangeCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `pwchange${Date.now()}`,
-        firstName: 'PwChange',
-        lastName: 'Test',
       };
 
       await request(app.getHttpServer())
@@ -292,9 +300,10 @@ describe('Authentication Security (e2e)', () => {
     const lockoutUser = {
       email: `lockout-${Date.now()}@example.com`,
       password: 'LockoutP@ss123',
+      name: 'Lockout Test',
+      companyName: `LockoutCo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `lockout${Date.now()}`,
-      firstName: 'Lockout',
-      lastName: 'Test',
     };
 
     beforeAll(async () => {
@@ -335,9 +344,10 @@ describe('Authentication Security (e2e)', () => {
       const duplicateUser = {
         email: `duplicate-${Date.now()}@example.com`,
         password: 'DuplicateP@ss123',
+        name: 'Duplicate Test',
+        companyName: `DuplicateCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `duplicate${Date.now()}`,
-        firstName: 'Duplicate',
-        lastName: 'Test',
       };
 
       // First registration
@@ -365,9 +375,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: `unique1-${Date.now()}@example.com`,
           password: 'UniqueP@ss123',
+          name: 'Unique Test',
+          companyName: `UniqueCo1${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: duplicateUsername,
-          firstName: 'Unique',
-          lastName: 'Test',
         });
 
       // Second registration with same username
@@ -376,9 +387,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: `unique2-${Date.now()}@example.com`,
           password: 'UniqueP@ss123',
+          name: 'Unique Test 2',
+          companyName: `UniqueCo2${Date.now()}`,
+          mobile: `12346${Date.now().toString().slice(-5)}`,
           username: duplicateUsername, // Same username
-          firstName: 'Unique',
-          lastName: 'Test',
         });
 
       expect(response.status).toBe(409);
@@ -390,9 +402,10 @@ describe('Authentication Security (e2e)', () => {
         .send({
           email: 'not-an-email',
           password: 'ValidP@ss123',
+          name: 'Email Test',
+          companyName: `EmailTestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `emailtest${Date.now()}`,
-          firstName: 'Email',
-          lastName: 'Test',
         });
 
       expect(response.status).toBe(400);
@@ -406,7 +419,7 @@ describe('Authentication Security (e2e)', () => {
         .post('/auth/register')
         .send({
           email: `required-${Date.now()}@example.com`,
-          // Missing password, username, firstName, lastName
+          // Missing password, name, companyName, mobile
         });
 
       expect(response.status).toBe(400);
@@ -417,9 +430,10 @@ describe('Authentication Security (e2e)', () => {
     const test2FAUser = {
       email: `2fa-security-${Date.now()}@example.com`,
       password: 'TwoFAP@ss123',
+      name: 'TwoFA Security',
+      companyName: `TwoFACo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `2fasecurity${Date.now()}`,
-      firstName: 'TwoFA',
-      lastName: 'Security',
     };
     let accessToken: string;
     let twoFASecret: string;

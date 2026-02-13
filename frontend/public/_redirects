@@ -1,0 +1,8 @@
+# Cloudflare Pages Redirects Configuration
+# SPA fallback - all routes serve index.html (React Router handles routing)
+
+# API requests proxy to backend (replace with your backend URL in production)
+/api/*  https://api.yourdomain.com/:splat  200
+
+# SPA fallback for all other routes
+/*  /index.html  200

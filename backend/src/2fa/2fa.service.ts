@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { IpAddressValidator } from '../common/validators/ip-address.validator';
 
 type ClientContext = { ip?: string; userAgent?: string };
 
@@ -80,7 +81,7 @@ export class TwoFAService {
     // Generate backup codes
     const backupCodes = this.generateBackupCodes(10);
     const hashedBackupCodes = await Promise.all(
-      backupCodes.map(code => bcrypt.hash(code, 10)),
+      backupCodes.map((code) => bcrypt.hash(code, 10)),
     );
 
     // Enable 2FA
@@ -99,7 +100,8 @@ export class TwoFAService {
     return {
       message: '2FA enabled successfully',
       backupCodes,
-      warning: 'Save these backup codes in a safe place. Each can be used once if you lose access to your authenticator.',
+      warning:
+        'Save these backup codes in a safe place. Each can be used once if you lose access to your authenticator.',
     };
   }
 
@@ -146,11 +148,7 @@ export class TwoFAService {
     return { message: '2FA disabled successfully' };
   }
 
-  async verify2FALogin(
-    token: string,
-    code: string,
-    client?: ClientContext,
-  ) {
+  async verify2FALogin(token: string, code: string, client?: ClientContext) {
     try {
       const decoded = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
@@ -173,7 +171,9 @@ export class TwoFAService {
       }
 
       if (user.twoFALockUntil && user.twoFALockUntil > new Date()) {
-        throw new UnauthorizedException('2FA temporarily locked. Try again later');
+        throw new UnauthorizedException(
+          '2FA temporarily locked. Try again later',
+        );
       }
 
       const secret = this.decryptSecret(user.twoFASecret as string);
@@ -248,7 +248,8 @@ export class TwoFAService {
   private generateBackupCodes(count: number): string[] {
     const codes = [];
     for (let i = 0; i < count; i++) {
-      codes.push(crypto.randomBytes(5).toString('hex').toUpperCase());
+      // Use 12 bytes (24 hex chars) for ~96 bits of entropy (was 5 bytes/40 bits)
+      codes.push(crypto.randomBytes(12).toString('hex').toUpperCase());
     }
     return codes;
   }
@@ -266,7 +267,7 @@ export class TwoFAService {
         action,
         resource,
         metadata: metadata ? JSON.stringify(metadata) : null,
-        ipAddress: client?.ip,
+        ipAddress: IpAddressValidator.sanitize(client?.ip), // M-2: Validate IP
         userAgent: client?.userAgent,
       },
     });
@@ -296,7 +297,7 @@ export class TwoFAService {
     // Generate new backup codes
     const backupCodes = this.generateBackupCodes(10);
     const hashedBackupCodes = await Promise.all(
-      backupCodes.map(code => bcrypt.hash(code, 10)),
+      backupCodes.map((code) => bcrypt.hash(code, 10)),
     );
 
     // Update backup codes
@@ -316,7 +317,9 @@ export class TwoFAService {
   private getEncryptionKey(): Buffer {
     const key = process.env.TWOFA_ENCRYPTION_KEY;
     if (!key) {
-      throw new Error('TWOFA_ENCRYPTION_KEY is required for 2FA secret encryption');
+      throw new Error(
+        'TWOFA_ENCRYPTION_KEY is required for 2FA secret encryption',
+      );
     }
     const buffer = Buffer.from(key, 'base64');
     if (buffer.length !== 32) {
@@ -328,7 +331,10 @@ export class TwoFAService {
   private encryptSecret(secret: string): string {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', this.encryptionKey, iv);
-    const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(secret, 'utf8'),
+      cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
     return `${iv.toString('base64')}:${ciphertext.toString('base64')}:${tag.toString('base64')}`;
   }
@@ -338,9 +344,16 @@ export class TwoFAService {
     const iv = Buffer.from(ivB64, 'base64');
     const ciphertext = Buffer.from(dataB64, 'base64');
     const tag = Buffer.from(tagB64, 'base64');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      this.encryptionKey,
+      iv,
+    );
     decipher.setAuthTag(tag);
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]);
     return decrypted.toString('utf8');
   }
 

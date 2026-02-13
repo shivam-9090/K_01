@@ -66,9 +66,10 @@ describe('Rate Limiting (e2e)', () => {
     const testUser = {
       email: `2fa-rate-${Date.now()}@example.com`,
       password: 'SecurePass@123456',
+      name: 'TwoFA Rate',
+      companyName: `TwoFARateCo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `2farate${Date.now()}`,
-      firstName: 'TwoFA',
-      lastName: 'Rate',
     };
 
     beforeAll(async () => {

@@ -1,38 +1,38 @@
 import {
-  IsEmail,
-  IsString,
-  MinLength,
-  MaxLength,
   IsOptional,
   Matches,
+  MinLength,
+  MaxLength,
+  IsString,
 } from 'class-validator';
+import {
+  IsName,
+  IsRequiredEmail,
+  IsOptionalString,
+} from '../../common/validators';
+import { IsStrongPassword } from '../../common/validators/password.decorator';
 
 export class RegisterDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(200)
+  @IsName()
   name: string; // Full name of the user
 
-  @IsEmail()
+  @IsOptionalString(3, 50)
+  @Matches(/^[a-zA-Z0-9_-]+$/, {
+    message:
+      'Username can only contain letters, numbers, underscores, and hyphens',
+  })
+  username?: string; // Optional username for login/display
+
+  @IsRequiredEmail()
   email: string;
 
-  @IsString()
-  @MinLength(12)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={}\[\]:;"'<>,.?/]).{12,}$/,
-    {
-      message:
-        'Password must be at least 12 characters and include upper, lower, number, and symbol',
-    },
-  )
+  @IsStrongPassword(12)
   password: string;
 
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @IsName()
   companyName: string; // Required for BOSS registration
 
-  @IsString()
+  @IsOptionalString()
   @Matches(
     /^[+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/,
     {
@@ -43,10 +43,10 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @IsEmail()
+  @IsRequiredEmail()
   email: string;
 
-  @IsString()
+  @IsOptionalString()
   password: string;
 }
 
@@ -66,15 +66,22 @@ export class RefreshTokenDto {
 }
 
 export class ChangePasswordDto {
-  @IsString()
-  @MinLength(8)
+  @IsOptionalString(8)
   oldPassword: string;
 
+  @IsStrongPassword(8)
+  newPassword: string;
+}
+
+export class ForgotPasswordDto {
+  @IsRequiredEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
   @IsString()
-  @MinLength(8)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={}\[\]:;"'<>,.?/]).{8,}$/,
-    { message: 'Password must include upper, lower, number, and symbol' },
-  )
+  token: string;
+
+  @IsStrongPassword(12)
   newPassword: string;
 }

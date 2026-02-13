@@ -22,8 +22,7 @@ export class SearchService {
     const whereClause = {
       OR: [
         { email: { contains: query, mode: 'insensitive' as const } },
-        { firstName: { contains: query, mode: 'insensitive' as const } },
-        { lastName: { contains: query, mode: 'insensitive' as const } },
+        { name: { contains: query, mode: 'insensitive' as const } },
       ],
     };
 
@@ -35,8 +34,7 @@ export class SearchService {
         select: {
           id: true,
           email: true,
-          firstName: true,
-          lastName: true,
+          name: true,
           role: true,
           createdAt: true,
           isTwoFAEnabled: true,
@@ -64,8 +62,7 @@ export class SearchService {
       select: {
         id: true,
         email: true,
-        firstName: true,
-        lastName: true,
+        name: true,
         role: true,
         createdAt: true,
       },
@@ -87,8 +84,7 @@ export class SearchService {
         select: {
           id: true,
           email: true,
-          firstName: true,
-          lastName: true,
+          name: true,
           role: true,
           createdAt: true,
         },
@@ -129,8 +125,7 @@ export class SearchService {
     if (query) {
       whereClause.OR = [
         { email: { contains: query, mode: 'insensitive' } },
-        { firstName: { contains: query, mode: 'insensitive' } },
-        { lastName: { contains: query, mode: 'insensitive' } },
+        { name: { contains: query, mode: 'insensitive' } },
       ];
     }
 
@@ -156,8 +151,7 @@ export class SearchService {
         select: {
           id: true,
           email: true,
-          firstName: true,
-          lastName: true,
+          name: true,
           role: true,
           createdAt: true,
           isTwoFAEnabled: true,

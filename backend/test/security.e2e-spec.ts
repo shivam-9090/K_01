@@ -141,9 +141,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: 'invalid-email',
           password: 'ValidPass@123456',
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: 'testuser',
-          firstName: 'Test',
-          lastName: 'User',
         })
         .expect(400)
         .expect((res) => {
@@ -157,9 +158,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: 'test@example.com',
           password: 'weak',
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: 'testuser',
-          firstName: 'Test',
-          lastName: 'User',
         })
         .expect(400)
         .expect((res) => {
@@ -173,9 +175,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: 'test@example.com',
           password: 'NoSpecialChar123',
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: 'testuser',
-          firstName: 'Test',
-          lastName: 'User',
         })
         .expect(400);
     });
@@ -186,9 +189,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: 'test@example.com',
           password: 'ValidPass@123456',
+          name: 'Test User',
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: 'testuser',
-          firstName: 'Test',
-          lastName: 'User',
           extraField: 'should be rejected',
         })
         .expect(400)
@@ -225,9 +229,10 @@ describe('Security Features (e2e)', () => {
     const testUser = {
       email: `security-test-${Date.now()}@example.com`,
       password: 'SecurePass@123456',
+      name: 'Security Test',
+      companyName: `SecurityCo${Date.now()}`,
+      mobile: `12345${Date.now().toString().slice(-5)}`,
       username: `sectest${Date.now()}`,
-      firstName: 'Security',
-      lastName: 'Test',
     };
 
     beforeAll(async () => {
@@ -285,9 +290,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: 'test@example.com',
           password: 'ValidPass@123456',
+          name: largePayload,
+          companyName: `TestCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: 'testuser',
-          firstName: largePayload,
-          lastName: 'User',
         })
         .expect((res) => {
           expect(res.status).toBeGreaterThanOrEqual(400);
@@ -305,9 +311,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: testEmail,
           password: testPassword,
+          name: 'Hash Test',
+          companyName: `HashCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `hashtest${Date.now()}`,
-          firstName: 'Hash',
-          lastName: 'Test',
         })
         .expect(201);
 
@@ -345,9 +352,10 @@ describe('Security Features (e2e)', () => {
         .send({
           email: testEmail,
           password: testPassword,
+          name: 'Lock Test',
+          companyName: `LockCo${Date.now()}`,
+          mobile: `12345${Date.now().toString().slice(-5)}`,
           username: `locktest${Date.now()}`,
-          firstName: 'Lock',
-          lastName: 'Test',
         });
 
       // Make 6 failed login attempts
@@ -376,9 +384,10 @@ describe('Security Features (e2e)', () => {
       const testUser = {
         email: `token-test-${Date.now()}@example.com`,
         password: 'TokenTest@123456',
+        name: 'Token Test',
+        companyName: `TokenCo${Date.now()}`,
+        mobile: `12345${Date.now().toString().slice(-5)}`,
         username: `tokentest${Date.now()}`,
-        firstName: 'Token',
-        lastName: 'Test',
       };
 
       // Register

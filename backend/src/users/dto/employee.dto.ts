@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   Matches,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateEmployeeDto {
@@ -72,4 +73,16 @@ export class UpdateEmployeeDto {
   @IsInt()
   @Min(0)
   attendance?: number;
+}
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  username?: string;
 }

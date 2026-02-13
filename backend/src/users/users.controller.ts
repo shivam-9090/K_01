@@ -2,19 +2,19 @@ import {
   Controller,
   Get,
   Param,
-  UseGuards,
-  Request,
   Put,
   Body,
   Delete,
   Query,
   Patch,
   BadRequestException,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../auth/guards/auth.guard';
-import { Roles, RolesGuard } from '../auth/guards/roles.guard';
-import { IsString, MinLength, Matches } from 'class-validator';
+import { Authenticated, BossOnly, CurrentUser } from '../common/decorators';
+import { IsString, MinLength, Matches, IsOptional } from 'class-validator';
 
 // DTO for updating company name
 class UpdateCompanyNameDto {
@@ -38,123 +38,169 @@ class ChangePasswordDto {
   newPassword: string;
 }
 
+// DTO for updating profile
+class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+}
+
+@ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get('me')
-  async getCurrentUser(@Request() req) {
-    return this.usersService.findById(req.user.userId);
+  @Authenticated()
+  @ApiOperation({
+    summary: 'Get current user',
+    description: 'Returns authenticated user details',
+  })
+  @ApiResponse({ status: 200, description: 'User retrieved successfully' })
+  async getCurrentUser(@CurrentUser('userId') userId: string) {
+    return this.usersService.findById(userId);
   }
 
   @Get('me/profile')
-  async getMyProfile(@Request() req) {
-    return this.usersService.getProfile(req.user.userId);
+  @Authenticated()
+  @ApiOperation({
+    summary: 'Get user profile',
+    description: 'Returns detailed user profile with company info',
+  })
+  @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
+  async getMyProfile(@CurrentUser('userId') userId: string) {
+    return this.usersService.getProfile(userId);
   }
 
   @Patch('me/company-name')
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
+  @BossOnly()
   async updateCompanyName(
-    @Request() req,
+    @CurrentUser('userId') userId: string,
     @Body() updateDto: UpdateCompanyNameDto,
   ) {
-    return this.usersService.updateCompanyName(
-      req.user.userId,
-      updateDto.companyName,
-    );
+    return this.usersService.updateCompanyName(userId, updateDto.companyName);
   }
 
   @Patch('me/password')
+  @Authenticated()
   async changePassword(
-    @Request() req,
+    @CurrentUser('userId') userId: string,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.usersService.changePassword(
-      req.user.userId,
+      userId,
       changePasswordDto.oldPassword,
       changePasswordDto.newPassword,
     );
   }
 
+  @Patch('me/profile')
+  @Authenticated()
+  async updateProfile(
+    @CurrentUser('userId') userId: string,
+    @Body() updateDto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(
+      userId,
+      updateDto.name,
+      updateDto.avatarUrl,
+    );
+  }
+
   @Get('me/audit-logs')
+  @Authenticated()
   async getMyAuditLogs(
-    @Request() req,
+    @CurrentUser('userId') userId: string,
     @Query('skip') skip = 0,
     @Query('take') take = 20,
   ) {
-    return this.usersService.getUserAuditLogs(req.user.userId, skip, take);
+    // For own audit logs, userId and requestingUserId are the same
+    const skipNum = Number(skip) || 0;
+    const takeNum = Number(take) || 20;
+    return this.usersService.getUserAuditLogs(userId, userId, skipNum, takeNum);
   }
 
   @Get('me/sessions')
-  async getMySessions(@Request() req) {
-    return this.usersService.getUserSessions(req.user.userId);
+  @Authenticated()
+  async getMySessions(@CurrentUser('userId') userId: string) {
+    return this.usersService.getUserSessions(userId);
   }
 
   @Delete('me/sessions/:sessionId')
-  async revokeSession(@Param('sessionId') sessionId: string) {
-    return this.usersService.revokeSession(sessionId);
+  @Authenticated()
+  async revokeSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.usersService.revokeSession(sessionId, userId);
   }
 
   @Delete('me/sessions')
-  async revokeAllSessions(@Request() req) {
-    return this.usersService.revokeAllSessions(req.user.userId);
+  @Authenticated()
+  async revokeAllSessions(@CurrentUser('userId') userId: string) {
+    return this.usersService.revokeAllSessions(userId);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Get()
+  @BossOnly()
   async getAllUsers(@Query('skip') skip = 0, @Query('take') take = 10) {
     return this.usersService.getAllUsers(skip, take);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Get(':id')
-  async getUser(@Param('id') id: string) {
+  @BossOnly()
+  async getUser(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
     const user = await this.usersService.findById(id);
     if (!user) {
       throw new BadRequestException('User not found');
     }
+
+    // Prevent cross-company access (IDOR protection)
+    if (user.companyId !== companyId) {
+      throw new ForbiddenException('Cannot access users from other companies');
+    }
     return user;
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Patch(':id/role')
+  @BossOnly()
   async updateUserRole(@Param('id') id: string, @Body('role') role: string) {
     return this.usersService.updateUserRole(id, role);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Patch(':id/deactivate')
+  @BossOnly()
   async deactivateUser(@Param('id') id: string) {
     return this.usersService.deactivateUser(id);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Patch(':id/activate')
+  @BossOnly()
   async activateUser(@Param('id') id: string) {
     return this.usersService.activateUser(id);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Get(':id/audit-logs')
+  @BossOnly()
   async getUserAuditLogs(
     @Param('id') id: string,
+    @CurrentUser('userId') requestingUserId: string,
     @Query('skip') skip = 0,
     @Query('take') take = 20,
   ) {
-    return this.usersService.getUserAuditLogs(id, skip, take);
+    return this.usersService.getUserAuditLogs(id, requestingUserId, skip, take);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('BOSS')
   @Get(':id/sessions')
+  @BossOnly()
   async getUserSessions(@Param('id') id: string) {
     return this.usersService.getUserSessions(id);
   }

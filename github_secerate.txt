@@ -1,0 +1,90 @@
+private key = SHA256:FPhnTe+roRswUkkxSihECHKF6+bLAI62+PZ8O/L8GRg=
+
+App ID: 2661645
+
+Client ID: Iv23liEuIf0WcG6H2EjV
+
+
+
+
+=== oauth 
+
+Client ID
+Ov23likHefGVAlanLqIC
+
+client secaret id = 0832809c0464bc31ac2b2186e5165deb50433802
+
+
+
+
+== prompt
+
+hey i have this , so do like add now as two method i need first login with github and acess there ..
+2. Lock the OAuth scope (keep it minimal)
+
+Use only:
+
+read:user
+
+
+That’s enough to:
+
+Identify the user
+
+Get GitHub ID
+
+Get username + avatar
+
+Do not add repo scopes here. That’s not OAuth’s job.
+
+3. Decide how this fits your app auth
+
+You must choose one (mentally, not in GitHub):
+
+GitHub OAuth = login method
+OR
+
+GitHub OAuth = account linking
+
+Both are valid. Just be consistent.
+
+4. Decide what you will store after OAuth
+
+Write this down now so you don’t improvise later.
+
+Store:
+
+github_user_id
+
+github_username
+
+avatar_url
+
+linked_user_id (your app user)
+
+Do not store:
+
+OAuth access token long-term
+
+Refresh token unless needed
+
+Identity > access.
+
+=== also i need to one feature afetr lohgin in profile add one thign connect to githbu and user can connect githbu accoutn and ...!!! after that github can acess repo ... 
+
+- first do this all 
+
+
+
+
+
+
+
+=========================================
+
+React
+TypeScript(TSX)
+Tailwind CSS 
+NEXTJS
+VITE
+State management: Zustand (first), Redux (later)

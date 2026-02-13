@@ -70,6 +70,16 @@ import { MetricsService } from './metrics.service';
       help: 'Total number of API errors',
       labelNames: ['endpoint', 'error_type'],
     }),
+    // Database Query Metrics
+    makeCounterProvider({
+      name: 'db_slow_queries_total',
+      help: 'Total number of slow database queries (>500ms)',
+    }),
+    makeHistogramProvider({
+      name: 'db_query_duration_seconds',
+      help: 'Database query duration in seconds',
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+    }),
   ],
   exports: [MetricsService, PrometheusModule],
 })
